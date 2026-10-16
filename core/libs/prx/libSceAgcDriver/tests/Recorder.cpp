@@ -4680,7 +4680,7 @@ private:
     static inline StorageUploadProbe* active = nullptr;
 };
 
-bool selectedStorageImportTests(const Device& device, Recorder& recorder) {
+bool selectedStorageImportTests(const Device& device, Recorder& recorder, bool preimport) {
     const auto& base = device.GetContext();
     if (base.hostImportAlignment == 0) return false;
     constexpr std::size_t layerBytes = 65536;
@@ -4715,7 +4715,7 @@ bool selectedStorageImportTests(const Device& device, Recorder& recorder) {
             } cleanup{base, recorder, memory, address, registered};
             const auto active = address + selected * layerBytes;
             Require(HostImportFor(base, address, 2 * layerBytes) == nullptr, "the selected-import fixture imported the whole array");
-            if (HostImportFor(base, active, layerBytes) == nullptr) return false;
+            if (preimport && HostImportFor(base, active, layerBytes) == nullptr) return false;
             TextureDetiler detiler(base);
             auto context = base;
             context.detiler = &detiler;
@@ -8412,7 +8412,7 @@ int main(int argc, char** argv) {
         Recorder recorder(device.GetContext());
         recorder.Activate();
         if (argc == 2 && std::string_view(argv[1]) == "--storage-selected-import-only") {
-            return selectedStorageImportTests(device, recorder) ? 0 : 77;
+            return selectedStorageImportTests(device, recorder, true) && selectedStorageImportTests(device, recorder, false) ? 0 : 77;
         }
         if (argc == 2 && std::string_view(argv[1]) == "--copied-direct-only") {
             copiedDirectOrderingTests(device, recorder);
