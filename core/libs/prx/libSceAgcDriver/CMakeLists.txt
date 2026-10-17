@@ -1192,6 +1192,13 @@ if(BUILD_TESTING)
     set_tests_properties(agc_host_import_retirement PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
     add_test(NAME agc_storage_selected_import COMMAND agc_driver_recorder_tests --storage-selected-import-only)
     set_tests_properties(agc_storage_selected_import PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        foreach(mode IN ITEMS watch unwatch)
+            add_test(NAME agc_storage_selected_import_${mode} COMMAND agc_driver_recorder_tests --storage-selected-import-only)
+            set_tests_properties(agc_storage_selected_import_${mode} PROPERTIES
+                ENVIRONMENT "APS5_WRITE_WATCH_IMPORTS=${mode}" SKIP_RETURN_CODE 77 TIMEOUT 30)
+        endforeach()
+    endif()
     if(WIN32)
         set_tests_properties(agc_storage_selected_import PROPERTIES ENVIRONMENT_MODIFICATION
                 "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
