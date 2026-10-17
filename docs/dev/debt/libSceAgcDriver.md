@@ -1,5 +1,11 @@
 # libSceAgcDriver technical debt
 
+### Experimental submission progress
+
+`APS5_SUBMIT_PROGRESS=1` enables bounded pacing for queue-zero finite prefixes ending in a decoded memory release. Unproven CP waits, flips and conditional command ranges retain normal asynchronous acceptance. For a final REWIND, the ticket acknowledges only the already-recorded prefix before waiting for the guest to release its continuation; it neither completes the logical submission nor executes the continuation early. The caller can wait for that prefix's specific recorder timeline within the remainder of a two-millisecond budget. Neither a timeout nor an unavailable timeline asserts completion, retires a resource, or changes the accepted submission. Guest sleep deadlines and the existing completion/write-back rules remain authoritative. The ticket keeps its device alive only while the call or queued commit needs it; the existing unlocked timeline-wait registration protects teardown.
+
+The switch remains off by default. A CP wait is eligible only when a preceding nonpredicated literal memory write covers its compared bytes and satisfies the existing PM4 comparison; unknown writes and GPU draw/dispatch work clear that local proof. Pacing does not elide the wait or replace its execution-time visibility rules. Pacing can reduce useful CPU/GPU overlap in asynchronous workloads, and Vulkan/condition-variable scheduling can return later than the requested timeout. Hardware measurements and cross-title validation are required before recommending it. Long work and genuine CPU dependencies must continue through the original path after the pacing budget expires. No whole-device wait is added.
+
 ### Silent stubs
 
 - [sceAgcDriverRegisterDefaultOwner](../../../core/libs/prx/libSceAgcDriver/Unimplemented.cpp) (libSceAgcDriver) - takes one uint32 owner by value (OpenAGC `include/agcdriver.h`, SharpEmu `AgcExports.DriverResources.cs`) and returns 0 without recording it. PPSA21480 treats the code 0x8A6C9018 it returned before as fatal. Console behaviour is unverified: OpenAGC describes the function as a firmware 5.50 stub that returns 0x8A6C9018, SharpEmu returns 0

@@ -411,8 +411,8 @@ void Driver::execute(const Submission& submission) {
             return;
         }
         if ((std::atomic_ref<std::uint32_t>(*const_cast<std::uint32_t*>(submission.rewindTail - 1)).load(std::memory_order_acquire) & 0x80000000u) != 0) {
-            DrawPipeline::Queue0().Enqueue([this] {
-                submitOpenWork();
+            DrawPipeline::Queue0().Enqueue([this, progress = submission.progress] {
+                submitOpenWork(progress);
                 wakeQueueZeroForCompletions();
             }, {});
             executeRewindTail(submission);
@@ -435,7 +435,10 @@ void Driver::execute(const Submission& submission) {
         if (localDevice != nullptr) localDevice->SubmitRecorded(submission.queue == 0);
     }
     endTiming.Finish();
-    if (submission.rewindTail != nullptr) executeRewindTail(submission);
+    if (submission.rewindTail != nullptr) {
+        if (submission.progress) submitOpenWork(submission.progress);
+        executeRewindTail(submission);
+    }
 }
 
 }
