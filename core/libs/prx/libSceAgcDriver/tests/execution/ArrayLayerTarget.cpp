@@ -395,6 +395,7 @@ void UncommittedUnusedLayers(AgcDriver::VulkanDevice& device, std::uint32_t slic
     auto* texels = reinterpret_cast<std::uint32_t*>(active);
     std::fill_n(texels, LayerBytes / sizeof(std::uint32_t), Initial);
     Require(AgcDriver::GuestMemory::CollectWrites(active, LayerBytes) != 0, "the committed array slice has no write history");
+    Require(AgcDriver::GuestMemory::CollectWritesUncached(surface, SurfaceBytes) == 0, "the uncommitted array fixture unexpectedly has complete backend write history");
     Require(AgcDriver::GuestMemory::CollectWrites(surface, SurfaceBytes) == 0, "the unused array slices unexpectedly have complete write history");
     AgcDriver::GuestMemory::BumpCollectEpoch();
     DrawSlice(device, surface, slice, TileR64KBX, false);
