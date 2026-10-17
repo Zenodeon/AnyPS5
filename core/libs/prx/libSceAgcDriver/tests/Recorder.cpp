@@ -109,6 +109,54 @@ void ReleaseWatched(void* block, std::size_t bytes) {
 #endif
 }
 
+bool partialWatchRestorationTests() {
+#ifdef _WIN32
+    constexpr std::size_t bytes = 131072;
+    constexpr std::size_t page = 4096;
+    constexpr std::size_t restoredOffset = 4 * page;
+    constexpr std::size_t restoredBytes = 4 * page;
+    if (!AgcDriver::GuestMemory::WriteWatched()) return false;
+    auto* memory = static_cast<std::uint8_t*>(GuestArena::GuestArenaAllocate_nid_postfix(bytes, 65536));
+    if (memory == nullptr) return false;
+    GuestArena::GuestArenaCommit_nid_postfix(memory, bytes, PAGE_READWRITE, restoredBytes);
+    struct Cleanup {
+        std::uint8_t* memory;
+        ~Cleanup() { ReleaseWatched(memory, bytes); }
+    } cleanup{memory};
+    const auto address = reinterpret_cast<std::uint64_t>(memory);
+    AgcDriver::GuestMemory::Unwatch(address, 65536);
+    Require(!AgcDriver::GuestMemory::Watched(address, page), "the partial remap fixture was not excluded");
+    memory[page] = 0x22;
+    AgcDriver::GuestMemory::MarkWritten(address + page, 1);
+    Require(AgcDriver::GuestMemory::UntrackedHint(address + page, 1) != 0, "the excluded remap fixture has no driver hint");
+    GuestArena::GuestArenaReset_nid_postfix(memory + restoredOffset, restoredBytes);
+    GuestArena::GuestArenaCommit_nid_postfix(memory + restoredOffset, restoredBytes, PAGE_READWRITE, restoredBytes);
+    Require(AgcDriver::GuestMemory::Watched(address + restoredOffset, restoredBytes), "a partial private remap did not restore its write watch");
+    Require(!AgcDriver::GuestMemory::Watched(address, restoredOffset), "a partial remap restored an excluded prefix");
+    Require(!AgcDriver::GuestMemory::Watched(address + restoredOffset + restoredBytes, page), "a partial remap restored an excluded suffix");
+    Require(AgcDriver::GuestMemory::UntrackedHint(address + page, 1) == 0, "a partial remap retained a stale driver hint");
+    std::memset(memory + restoredOffset, 0x33, restoredBytes);
+    AgcDriver::GuestMemory::BumpCollectEpoch();
+    const auto generation = AgcDriver::GuestMemory::CollectWrites(address + restoredOffset, restoredBytes);
+    Require(generation != 0, "the private remap has no collected CPU write history");
+    memory[restoredOffset + page] = 0x44;
+    AgcDriver::GuestMemory::BumpCollectEpoch();
+    Require(AgcDriver::GuestMemory::CollectWrites(address + restoredOffset, restoredBytes) != 0, "the private remap stopped collecting CPU writes");
+    Require(!AgcDriver::GuestMemory::UnchangedSince(address + restoredOffset, restoredBytes, generation), "the private remap hid a genuine CPU write");
+    GuestArena::GuestArenaReset_nid_postfix(memory, restoredBytes);
+    GuestArena::GuestArenaCommit_nid_postfix(memory, restoredBytes, PAGE_READWRITE, restoredBytes);
+    Require(AgcDriver::GuestMemory::Watched(address, restoredBytes), "the first private pages did not regain coverage");
+    Require(!AgcDriver::GuestMemory::Watched(address + 12 * page, page), "restoring the first pages restored an excluded tail");
+    memory[12 * page] = 0x55;
+    AgcDriver::GuestMemory::MarkWritten(address + 12 * page, 1);
+    AgcDriver::GuestMemory::Unwatch(address + 12 * page, page);
+    Require(AgcDriver::GuestMemory::UntrackedHint(address + 12 * page, 1) == 0, "excluding a partially watched block invented a write-watch hint");
+    return true;
+#else
+    return false;
+#endif
+}
+
 std::optional<std::size_t> selectDevice(std::span<const VkPhysicalDeviceProperties> devices, std::string_view request) {
     const auto rankDeviceType = [](VkPhysicalDeviceType type) {
         switch (type) {
@@ -8176,6 +8224,11 @@ void Run(Context context) {
 
 int main(int argc, char** argv) {
     try {
+        if (argc == 2 && std::string_view(argv[1]) == "--partial-watch-restoration-only") {
+            if (!partialWatchRestorationTests()) return 77;
+            std::cout << "partial private write-watch restoration tests passed\n";
+            return 0;
+        }
         if (argc == 2 && std::string_view(argv[1]) == "--device-selection-only") {
             deviceSelectionTests();
             std::cout << "recorder device selection tests passed\n";
