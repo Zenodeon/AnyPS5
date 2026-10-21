@@ -3,6 +3,7 @@
 #include "prx/libSceAgcDriver/Graphics/include/GuestBufferMemory.hpp"
 #include "prx/libSceAgcDriver/Graphics/include/ResidentMirror.hpp"
 #include "prx/libc/include/GuestAllocations.hpp"
+#include "prx/libc/include/GuestArena.hpp"
 #include "prx/libc/include/GuestWriteWatch.hpp"
 #include "Recompiler.hpp"
 #include "VulkanTestDevice.hpp"
@@ -80,8 +81,10 @@ public:
     explicit GuestHeap(bool writable, std::uint64_t ranges = 1, std::uint64_t rangeBytes = HeapBytes, void* at = nullptr) : ranges(ranges), rangeBytes(rangeBytes) {
         const auto bytes = rangeBytes * ranges;
 #ifdef _WIN32
-        raw = VirtualAlloc(at, bytes, MEM_RESERVE | MEM_COMMIT | MEM_WRITE_WATCH, PAGE_READWRITE);
+        raw = at == nullptr ? GuestArena::GuestArenaAllocate_nid_postfix(bytes, Block)
+                            : GuestArena::GuestArenaAllocateAtOrAbove_nid_postfix(reinterpret_cast<std::uintptr_t>(at), bytes, Block);
         Require(raw != nullptr && (at == nullptr || raw == at), "resident heap mirror: cannot allocate the guest heap");
+        GuestArena::GuestArenaCommit_nid_postfix(raw, bytes, PAGE_READWRITE, bytes);
         base = static_cast<std::uint8_t*>(raw);
 #else
         raw = mmap(at, bytes + Block, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | (at != nullptr ? MAP_FIXED_NOREPLACE : 0), -1, 0);
@@ -100,7 +103,8 @@ public:
         }
         GuestWriteWatch::GuestWriteWatchUnregister_nid_postfix(base, rangeBytes * ranges);
 #ifdef _WIN32
-        VirtualFree(raw, 0, MEM_RELEASE);
+        GuestArena::GuestArenaReset_nid_postfix(raw, rangeBytes * ranges);
+        GuestArena::GuestArenaRelease_nid_postfix(raw, rangeBytes * ranges);
 #else
         munmap(raw, rangeBytes * ranges + Block);
 #endif
@@ -325,7 +329,12 @@ int main() {
     try {
         const auto device = OpenVulkanTestDevice();
         if (!device) return VulkanTestSkipped;
-        if (!GuestWriteWatch::GuestWriteWatchAvailable_nid_postfix()) {
+#ifdef _WIN32
+        const bool watched = GuestArena::GuestArenaWriteWatched_nid_postfix();
+#else
+        const bool watched = GuestWriteWatch::GuestWriteWatchAvailable_nid_postfix();
+#endif
+        if (!watched) {
             std::puts("skipped, no guest write watch: heap mirrors need one");
             return VulkanTestSkipped;
         }
