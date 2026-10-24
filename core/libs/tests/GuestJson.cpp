@@ -1,5 +1,7 @@
 #include "prx/libc/include/general/VabiMacros.hpp"
 #include <cstddef>
+#include <clocale>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -7,6 +9,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Value { void* node; };
@@ -52,11 +55,14 @@ void APS5_VABI _ZN3sce4Json5Array5clearEv(Array*);
 const Value* APS5_VABI _ZNK3sce4Json5Array5frontEv(const Array*);
 Value* APS5_VABI _ZNK3sce4Json5Array8iteratorptEv(const Iterator*);
 void APS5_VABI _ZN3sce4Json5ArrayD1Ev(Array*);
+Array* APS5_VABI _ZN3sce4Json5ArrayaSERKS1_(Array*, const Array*);
 void APS5_VABI _ZN3sce4Json5Array9push_backERKNS0_5ValueE(Array*, const Value*);
 Iterator* APS5_VABI _ZNK3sce4Json5Array5beginEv(Iterator*, const Array*);
 Iterator* APS5_VABI _ZNK3sce4Json5Array3endEv(Iterator*, const Array*);
 std::size_t APS5_VABI _ZNK3sce4Json5Array4sizeEv(const Array*);
 const Value* APS5_VABI _ZNK3sce4Json5Array4backEv(const Array*);
+void APS5_VABI _ZN3sce4Json5Array9pop_frontEv(Array*);
+bool APS5_VABI _ZNK3sce4Json5Array5emptyEv(const Array*);
 void APS5_VABI _ZN3sce4Json5Array8iteratorD1Ev(Iterator*);
 Iterator* APS5_VABI _ZN3sce4Json5Array8iteratorppEv(Iterator*);
 Value* APS5_VABI _ZNK3sce4Json5Array8iteratordeEv(const Iterator*);
@@ -89,6 +95,13 @@ String* APS5_VABI _ZN3sce4Json6StringpLEh(String*, unsigned char);
 String* APS5_VABI _ZNK3sce4Json6String6substrEmm(String*, const String*, std::size_t, std::size_t);
 std::size_t APS5_VABI _ZNK3sce4Json6String4findEcm(const String*, char, std::size_t);
 std::size_t APS5_VABI _ZNK3sce4Json6String5rfindEcm(const String*, char, std::size_t);
+char APS5_VABI _ZNK3sce4Json6String2atEm(const String*, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String4findEPKcm(const String*, const char*, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String4findEPKcmm(const String*, const char*, std::size_t, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String4findERKS1_m(const String*, const String*, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String5rfindEPKcm(const String*, const char*, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String5rfindEPKcmm(const String*, const char*, std::size_t, std::size_t);
+std::size_t APS5_VABI _ZNK3sce4Json6String5rfindERKS1_m(const String*, const String*, std::size_t);
 bool APS5_VABI _ZNK3sce4Json6Object8iteratorneERKS2_(const Iterator*, const Iterator*);
 bool APS5_VABI _ZNK3sce4Json6Object8iteratoreqERKS2_(const Iterator*, const Iterator*);
 void APS5_VABI _ZN3sce4Json5ValueC1Ev(Value*);
@@ -289,6 +302,32 @@ static void NestingDepth() {
     _ZN3sce4Json5ValueD1Ev(&root);
 }
 
+static void ArrayAssignment() {
+    Array source{}, target{};
+    _ZN3sce4Json5ArrayC1Ev(&source);
+    _ZN3sce4Json5ArrayC1Ev(&target);
+    Value flag{}, real{};
+    _ZN3sce4Json5ValueC1Eb(&flag, true);
+    _ZN3sce4Json5ValueC1Ed(&real, 1.5);
+    _ZN3sce4Json5Array9push_backERKNS0_5ValueE(&source, &flag);
+    _ZN3sce4Json5Array9push_backERKNS0_5ValueE(&source, &real);
+    _ZN3sce4Json5Array9push_backERKNS0_5ValueE(&source, &flag);
+    _ZN3sce4Json5Array9push_backERKNS0_5ValueE(&target, &real);
+    Require(_ZN3sce4Json5ArrayaSERKS1_(&target, &source) == &target);
+    Require(_ZNK3sce4Json5Array4sizeEv(&target) == 3);
+    Require(_ZNK3sce4Json5Array4sizeEv(&source) == 3);
+    _ZN3sce4Json5Array5clearEv(&source);
+    Require(_ZNK3sce4Json5Array4sizeEv(&target) == 3);
+    Require(*_ZNK3sce4Json5Value10getBooleanEv(_ZNK3sce4Json5Array5frontEv(&target)));
+    Require(*_ZNK3sce4Json5Value10getBooleanEv(_ZNK3sce4Json5Array4backEv(&target)));
+    Require(_ZN3sce4Json5ArrayaSERKS1_(&target, &target) == &target);
+    Require(_ZNK3sce4Json5Array4sizeEv(&target) == 3);
+    _ZN3sce4Json5ValueD1Ev(&flag);
+    _ZN3sce4Json5ValueD1Ev(&real);
+    _ZN3sce4Json5ArrayD1Ev(&source);
+    _ZN3sce4Json5ArrayD1Ev(&target);
+}
+
 static void ObjectsAndArrays() {
     Object object{};
     _ZN3sce4Json6ObjectC1Ev(&object);
@@ -357,6 +396,18 @@ static void ObjectsAndArrays() {
     Require(_ZNK3sce4Json5Array4sizeEv(&copy) == 2);
     Require(*_ZNK3sce4Json5Value10getBooleanEv(_ZNK3sce4Json5Array5frontEv(&copy)));
     Require(*_ZNK3sce4Json5Value7getRealEv(_ZNK3sce4Json5Array4backEv(&copy)) == 2.5);
+    _ZN3sce4Json5Array9pop_frontEv(&copy);
+    Require(_ZNK3sce4Json5Array4sizeEv(&copy) == 1);
+    Require(*_ZNK3sce4Json5Value7getRealEv(_ZNK3sce4Json5Array5frontEv(&copy)) == 2.5);
+    _ZN3sce4Json5Array9pop_frontEv(&copy);
+    Require(_ZNK3sce4Json5Array5emptyEv(&copy));
+    threw = false;
+    try {
+        _ZN3sce4Json5Array9pop_frontEv(&copy);
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    Require(threw && _ZNK3sce4Json5Array5emptyEv(&copy));
     _ZN3sce4Json5ArrayD1Ev(&copy);
     _ZN3sce4Json5ArrayD1Ev(&array);
 }
@@ -675,6 +726,42 @@ static void StringMethods() {
     Require(_ZNK3sce4Json6String4findEcm(&base, 'z', 0) == _ZN3sce4Json6String4nposE);
     Require(_ZNK3sce4Json6String5rfindEcm(&base, '/', _ZN3sce4Json6String4nposE) == 3);
     Require(_ZNK3sce4Json6String5rfindEcm(&base, '/', 2) == 1);
+    const std::size_t npos = _ZN3sce4Json6String4nposE;
+    Require(_ZNK3sce4Json6String2atEm(&base, 0) == 'a');
+    Require(_ZNK3sce4Json6String2atEm(&base, 4) == 'c');
+    bool atRefused = false;
+    try {
+        _ZNK3sce4Json6String2atEm(&base, 5);
+    } catch (const std::out_of_range&) {
+        atRefused = true;
+    }
+    Require(atRefused);
+    Require(_ZNK3sce4Json6String4findEPKcm(&base, "/b", 0) == 1);
+    Require(_ZNK3sce4Json6String4findEPKcm(&base, "/", 2) == 3);
+    Require(_ZNK3sce4Json6String4findEPKcm(&base, "", 5) == 5);
+    Require(_ZNK3sce4Json6String4findEPKcm(&base, "", 6) == npos);
+    Require(_ZNK3sce4Json6String4findEPKcm(&base, "b/d", 0) == npos);
+    Require(_ZNK3sce4Json6String4findEPKcmm(&base, "b/d", 0, 2) == 2);
+    Require(_ZNK3sce4Json6String4findEPKcmm(&base, nullptr, 3, 0) == 3);
+    Require(_ZNK3sce4Json6String5rfindEPKcm(&base, "/", npos) == 3);
+    Require(_ZNK3sce4Json6String5rfindEPKcm(&base, "/", 2) == 1);
+    Require(_ZNK3sce4Json6String5rfindEPKcm(&base, "", npos) == 5);
+    Require(_ZNK3sce4Json6String5rfindEPKcmm(&base, "a/x", npos, 2) == 0);
+    Require(_ZNK3sce4Json6String5rfindEPKcmm(&base, "zz", npos, 2) == npos);
+    String needle{};
+    _ZN3sce4Json6StringC1EPKc(&needle, "/c");
+    Require(_ZNK3sce4Json6String4findERKS1_m(&base, &needle, 0) == 3);
+    Require(_ZNK3sce4Json6String4findERKS1_m(&base, &needle, 4) == npos);
+    Require(_ZNK3sce4Json6String5rfindERKS1_m(&base, &needle, npos) == 3);
+    Require(_ZNK3sce4Json6String5rfindERKS1_m(&base, &needle, 2) == npos);
+    _ZN3sce4Json6StringD1Ev(&needle);
+    bool findRefused = false;
+    try {
+        _ZNK3sce4Json6String4findEPKcm(&base, nullptr, 0);
+    } catch (const std::invalid_argument&) {
+        findRefused = true;
+    }
+    Require(findRefused);
     String part{};
     Require(_ZNK3sce4Json6String6substrEmm(&part, &base, 2, 3) == &part);
     Require(text(part) == "b/c");
@@ -1374,10 +1461,82 @@ static void ValueOperatorBool() {
     _ZN3sce4Json5ValueD1Ev(&cleared);
 }
 
-int main() {
+static int NumericLocale() {
+    const std::string previous = std::setlocale(LC_NUMERIC, nullptr);
+    const char* selected = nullptr;
+    for (const char* name : {"xx_COMMA", "de_DE.UTF-8", "de_DE.utf8", "de-DE", "German_Germany.1252", "fr_FR.UTF-8"}) {
+        if (std::setlocale(LC_NUMERIC, name) && std::strcmp(std::localeconv()->decimal_point, ",") == 0) {
+            selected = name;
+            break;
+        }
+    }
+    if (!selected) {
+        std::setlocale(LC_NUMERIC, previous.c_str());
+        std::fprintf(stderr, "No decimal-comma numeric locale is installed\n");
+        return 77;
+    }
+    std::printf("JSON numeric locale: %s\n", selected);
+    int failures = 0;
+    const auto check = [&](bool success, const char* operation, const char* actual) {
+        if (!success) {
+            std::fprintf(stderr, "%s failed: %s\n", operation, actual);
+            ++failures;
+        }
+    };
+    for (const auto number : {1.5, -0.125, 1.25e30, std::numeric_limits<double>::max(),
+                              std::numeric_limits<double>::min(), std::numeric_limits<double>::denorm_min()}) {
+        Value value{};
+        _ZN3sce4Json5ValueC1Ed(&value, number);
+        const auto text = Serialize(value);
+        check(text.find(',') == std::string::npos, "Decimal-point serialization", text.c_str());
+        Value parsed{};
+        _ZN3sce4Json5ValueC1Ev(&parsed);
+        const int result = _ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm(&parsed, text.c_str(), text.size());
+        check(result == 0 && *_ZNK3sce4Json5Value7getRealEv(&parsed) == number, "Numeric round trip", text.c_str());
+        _ZN3sce4Json5ValueD1Ev(&parsed);
+        _ZN3sce4Json5ValueD1Ev(&value);
+    }
+    for (const auto [text, number] : {std::pair{"1.5", 1.5}, {"-1.25e2", -125.0},
+                                    {"4.9406564584124654e-324", std::numeric_limits<double>::denorm_min()},
+                                    {"2.4703282292062327e-324", 0.0},
+                                    {"2.4703282292062328e-324", std::numeric_limits<double>::denorm_min()},
+                                    {"18446744073709551616", 18446744073709551616.0},
+                                    {"1e-999", 0.0}, {"-1e-999", -0.0}}) {
+        Value value{};
+        _ZN3sce4Json5ValueC1Ev(&value);
+        const int result = _ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm(&value, text, std::strlen(text));
+        const auto parsed = *_ZNK3sce4Json5Value7getRealEv(&value);
+        check(result == 0 && parsed == number && std::signbit(parsed) == std::signbit(number), "Decimal-point parsing", text);
+        _ZN3sce4Json5ValueD1Ev(&value);
+    }
+    Value root{};
+    _ZN3sce4Json5ValueC1Ev(&root);
+    constexpr char document[] = "{\"list\":[2.5,-0.125],\"value\":1.5}";
+    check(_ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm(&root, document, sizeof(document) - 1) == 0,
+          "Nested numeric parsing", document);
+    const auto serialized = Serialize(root);
+    check(serialized == document, "Nested numeric serialization", serialized.c_str());
+    check(_ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm(&root, "1,5", 3) == 0 && _ZNK3sce4Json5Value7getTypeEv(&root) == TypeUInteger &&
+          *_ZNK3sce4Json5Value11getUIntegerEv(&root) == 1, "Stop at a decimal comma", "1,5");
+    bool overflow = false;
+    try {
+        _ZN3sce4Json6Parser5parseERNS0_5ValueEPKcm(&root, "1e309", 5);
+    } catch (const std::runtime_error&) {
+        overflow = true;
+    }
+    check(overflow, "Retain overflow rejection", "1e309");
+    _ZN3sce4Json5ValueD1Ev(&root);
+    check(std::strcmp(std::localeconv()->decimal_point, ",") == 0, "Preserve host locale", selected);
+    std::setlocale(LC_NUMERIC, previous.c_str());
+    return failures ? 1 : 0;
+}
+
+int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--numeric-locale") == 0) return NumericLocale();
     ParseAndRoundTrip();
     NestingDepth();
     ObjectsAndArrays();
+    ArrayAssignment();
     ObjectFind();
     ObjectPair();
     ObjectInsert();
